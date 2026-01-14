@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flame | Your Identity</title>
+    <title>Flame | Bio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
@@ -11,163 +11,114 @@
         body { font-family: 'Space Mono', monospace; background: #000; color: white; overflow-x: hidden; }
         .glass { background: rgba(0,0,0,0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
         .scanline { position: fixed; inset: 0; background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.2) 50%); background-size: 100% 4px; pointer-events: none; z-index: 50; }
-        .fade-in { animation: fadeIn 0.8s ease forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         input { background: #111; border: 1px solid #333; color: white; padding: 8px; border-radius: 4px; width: 100%; margin-bottom: 10px; }
-        input:focus { border-color: #fff; outline: none; }
     </style>
 </head>
 <body>
     <div class="scanline"></div>
 
     <div id="editor-screen" class="hidden min-h-screen flex items-center justify-center p-4">
-        <div class="glass p-8 rounded-xl w-full max-w-md animate-fade relative z-10">
-            <h1 class="text-3xl font-bold mb-2 text-center">BioNuke</h1>
-            <p class="text-xs text-gray-500 text-center mb-6">CLAIM YOUR URL. PROTECT WITH PIN.</p>
+        <div class="glass p-8 rounded-xl w-full max-w-md relative z-10 animate-fade">
+            <h1 class="text-3xl font-bold mb-2 text-center text-red-500">FLAME</h1>
+            <p class="text-xs text-gray-500 text-center mb-6">CREATE YOUR BIO</p>
 
-            <label class="text-xs text-gray-400">USERNAME (Your URL)</label>
-            <input id="in-user" type="text" placeholder="coolguy" oninput="checkAvailability()">
-            <p id="url-preview" class="text-[10px] text-gray-500 mb-4 text-right">myweb.vercel.app/...</p>
-
-            <label class="text-xs text-gray-400">SECRET PIN (Don't forget this!)</label>
+            <label class="text-xs text-gray-400">USERNAME</label>
+            <input id="in-user" type="text" placeholder="username" oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9]/g, '')">
+            
+            <label class="text-xs text-gray-400">PIN (Password)</label>
             <input id="in-pin" type="password" placeholder="1234">
 
             <div class="h-px bg-gray-800 my-4"></div>
 
-            <label class="text-xs text-gray-400">BIO TEXT</label>
-            <textarea id="in-bio" class="w-full bg-[#111] border border-[#333] p-2 rounded text-white h-20 mb-2 focus:outline-none focus:border-white" placeholder="I am a developer..."></textarea>
-
+            <label class="text-xs text-gray-400">BIO</label>
+            <input id="in-bio" placeholder="I am a developer...">
+            
             <label class="text-xs text-gray-400">BACKGROUND URL</label>
-            <input id="in-bg" type="text" placeholder="https://i.imgur.com/...">
-
-            <label class="text-xs text-gray-400">MUSIC URL (MP3)</label>
-            <input id="in-music" type="text" placeholder="https://site.com/song.mp3">
+            <input id="in-bg" placeholder="https://...">
+            
+            <label class="text-xs text-gray-400">MUSIC URL</label>
+            <input id="in-music" placeholder="https://...">
 
             <label class="text-xs text-gray-400">THEME COLOR</label>
-            <input id="in-color" type="color" class="h-10 cursor-pointer">
+            <input id="in-color" type="color" class="h-10 cursor-pointer" value="#ff0000">
 
-            <button onclick="saveProfile()" class="w-full bg-white text-black font-bold py-3 rounded mt-4 hover:bg-gray-200 transition">
-                PUBLISH / UPDATE
+            <button onclick="saveProfile()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded mt-4 transition">
+                PUBLISH PROFILE
             </button>
-            
-            <p id="status-msg" class="text-center text-xs mt-4 h-4 text-yellow-400"></p>
         </div>
     </div>
 
-    <div id="profile-screen" class="hidden fixed inset-0 flex items-center justify-center">
-        <div id="p-bg" class="absolute inset-0 bg-cover bg-center opacity-50 transition-opacity duration-1000"></div>
-        
+    <div id="profile-screen" class="hidden fixed inset-0 flex items-center justify-center bg-black">
+        <div id="p-bg" class="absolute inset-0 bg-cover bg-center opacity-50 transition-all duration-1000"></div>
         <div id="overlay" class="absolute inset-0 z-40 bg-black flex items-center justify-center cursor-pointer">
-            <p class="text-xl animate-pulse tracking-widest">click to enter</p>
+             <p class="text-xl animate-pulse tracking-widest text-red-500">click to enter</p>
         </div>
-
         <div id="card" class="glass p-10 rounded-2xl text-center max-w-md w-full mx-4 z-30 opacity-0 transform scale-90 transition-all duration-1000">
             <img id="p-pfp" class="w-28 h-28 rounded-full mx-auto mb-4 border-2 shadow-lg object-cover">
             <h1 id="p-name" class="text-4xl font-bold mb-2 drop-shadow-md"></h1>
             <p id="p-bio" class="text-sm text-gray-200 font-mono whitespace-pre-wrap"></p>
         </div>
-        
         <audio id="p-audio" loop></audio>
     </div>
 
     <script>
-        // 🔴 SETUP: Paste your Supabase Keys Here
-        const SB_URL = 'YOUR_SUPABASE_URL_HERE';
-        const SB_KEY = 'YOUR_SUPABASE_ANON_KEY_HERE';
-        const sb = supabase.createClient(SB_URL, SB_KEY);
+        // 🔴 PASTE YOUR ANON KEY BELOW (STARTS WITH eyJ...)
+        const SB_URL = 'https://tevhzibiqhgzdedcruqo.supabase.co'; 
+        const SB_KEY = 'PASTE_YOUR_LONG_ANON_KEY_HERE'; 
 
-        // Routing Logic
-        const path = window.location.pathname.replace('/', ''); // Get 'username' from url.com/username
+        const sb = supabase.createClient(SB_URL, SB_KEY);
+        const path = window.location.pathname.replace('/', '');
 
         async function init() {
-            if (!path || path === "index.html") {
-                // Show Editor
-                document.getElementById('editor-screen').classList.remove('hidden');
-            } else {
-                // Show Profile
-                loadProfile(path);
-            }
-        }
-
-        // --- EDITOR LOGIC ---
-        function checkAvailability() {
-            const user = document.getElementById('in-user').value.toLowerCase().replace(/[^a-z0-9_]/g, '');
-            document.getElementById('in-user').value = user; // clean input
-            document.getElementById('url-preview').innerText = window.location.host + "/" + user;
+            if (!path || path === "index.html") document.getElementById('editor-screen').classList.remove('hidden');
+            else loadProfile(path);
         }
 
         async function saveProfile() {
-            const status = document.getElementById('status-msg');
-            status.innerText = "Saving...";
-            
             const user = document.getElementById('in-user').value;
             const pin = document.getElementById('in-pin').value;
-            
-            if(!user || !pin) return status.innerText = "Username and PIN required!";
-
-            // 1. Check if user exists
-            const { data: existing } = await sb.from('users').select('*').eq('username', user).single();
+            if(!user || !pin) return alert("Username and PIN required");
 
             const newData = {
-                username: user,
-                pin: pin,
+                username: user, pin: pin, 
                 bio: document.getElementById('in-bio').value,
                 bg_url: document.getElementById('in-bg').value,
                 music_url: document.getElementById('in-music').value,
                 color: document.getElementById('in-color').value
             };
 
+            const { data: existing } = await sb.from('users').select('*').eq('username', user).single();
+            
             if (existing) {
-                // Update Mode: Check PIN
-                if (existing.pin !== pin) {
-                    return status.innerText = "WRONG PIN! Cannot update.";
-                }
+                if (existing.pin !== pin) return alert("Wrong PIN!");
                 const { error } = await sb.from('users').update(newData).eq('username', user);
-                if(error) status.innerText = "Error saving.";
-                else window.location.href = "/" + user; // Go to profile
+                if(error) alert(error.message); else window.location.href = "/" + user;
             } else {
-                // Create Mode
                 const { error } = await sb.from('users').insert(newData);
-                if(error) status.innerText = "Username taken or error.";
-                else window.location.href = "/" + user; // Go to profile
+                if(error) alert(error.message); else window.location.href = "/" + user;
             }
         }
 
-        // --- PROFILE LOGIC ---
         async function loadProfile(username) {
             const { data: user, error } = await sb.from('users').select('*').eq('username', username).single();
+            if(error || !user) return document.body.innerHTML = "<h1 class='text-center mt-10 text-red-500'>USER NOT FOUND</h1>";
             
-            if(error || !user) {
-                document.body.innerHTML = "<div class='flex items-center justify-center h-screen text-red-500'>USER NOT FOUND (404)</div>";
-                return;
-            }
-
-            // Fill Data
             document.getElementById('profile-screen').classList.remove('hidden');
-            document.title = user.username;
             document.getElementById('p-bg').style.backgroundImage = `url(${user.bg_url})`;
             document.getElementById('p-name').innerText = user.username;
             document.getElementById('p-name').style.color = user.color;
             document.getElementById('p-bio').innerText = user.bio;
             document.getElementById('p-pfp').src = `https://ui-avatars.com/api/?name=${user.username}&background=random&size=200`;
             document.getElementById('p-pfp').style.borderColor = user.color;
-
             if(user.music_url) document.getElementById('p-audio').src = user.music_url;
 
-            // Click to Enter
             document.getElementById('overlay').addEventListener('click', function() {
-                this.style.opacity = 0;
-                setTimeout(() => this.remove(), 500);
-                
+                this.remove();
                 document.getElementById('p-bg').style.opacity = 1;
-                const card = document.getElementById('card');
-                card.style.opacity = 1;
-                card.style.transform = "scale(1)";
-
-                if(user.music_url) document.getElementById('p-audio').play().catch(e => console.log("Audio blocked"));
+                document.getElementById('card').classList.remove('opacity-0', 'scale-90');
+                if(user.music_url) document.getElementById('p-audio').play();
             });
         }
-
         init();
     </script>
 </body>
