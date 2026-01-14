@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioNuke | Identity</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* --- AESTHETIC CSS --- */
+        body { 
+            font-family: 'Space Mono', monospace; 
+            background: #050505; 
+            color: white; 
+            overflow: hidden; 
+        }
+        
+        /* Glassmorphism */
+        .glass {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 40px rgba(0,0,0,0.5);
+        }
+
+        /* Animations */
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .animate-fade { animation: fadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        
+        /* CRT Scanline */
+        .scanline {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.3) 50%);
+            background-size: 100% 4px; pointer-events: none; z-index: 50;
+        }
+
+        /* Input styling */
+        input, textarea { outline: none; transition: border 0.3s; }
+        input:focus, textarea:focus { border-color: white; }
+
+        /* Hide Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+    </style>
+</head>
+<body>
+
+    <div class="scanline"></div>
+
+    <div id="app" class="relative min-h-screen flex items-center justify-center">
+        
+        <div id="loader" class="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center font-mono">
+            <div class="text-2xl font-bold tracking-widest animate-pulse mb-4">
+                <span class="text-gray-500">&lt;</span>
+                <span class="text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">SYSTEM_BOOT</span>
+                <span class="text-gray-500">/&gt;</span>
+            </div>
+            <div class="w-64 h-1 bg-gray-900 rounded overflow-hidden relative">
+                <div id="progress-bar" class="h-full bg-white shadow-[0_0_15px_white] w-0 transition-all duration-300 ease-out"></div>
+            </div>
+            <div id="boot-log" class="mt-4 text-xs text-gray-400 h-6 font-mono">> initializing_</div>
+        </div>
+
+        <div id="login-screen" class="hidden text-center z-10 p-8 animate-fade">
+            <h1 class="text-5xl font-bold mb-2 tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">BioNuke</h1>
+            <p class="text-gray-400 mb-8 tracking-widest text-xs uppercase">Forged for Identity</p>
+            
+            <div class="space-y-4 flex flex-col items-center">
+                <button onclick="login('discord')" class="w-64 py-3 rounded bg-[#5865F2] hover:bg-[#4752C4] transition font-bold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(88,101,242,0.4)]">
+                    <i class="fab fa-discord"></i> Login with Discord
+                </button>
+                <button onclick="login('google')" class="w-64 py-3 rounded bg-white text-black hover:bg-gray-200 transition font-bold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(255,255,255,0.4)]">
+                    <i class="fab fa-google"></i> Login with Google
+                </button>
+            </div>
+        </div>
+
+        <div id="dashboard-screen" class="hidden w-full max-w-5xl p-4 z-10 flex gap-6 h-[85vh] animate-fade">
+            <div class="w-1/3 glass rounded-xl p-6 flex flex-col gap-4 overflow-y-auto">
+                <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+                    <h2 class="text-xl font-bold">CONFIG</h2>
+                    <button onclick="logout()" class="text-xs text-red-500 hover:text-red-400">[LOGOUT]</button>
+                </div>
+                
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-[10px] text-gray-400 uppercase tracking-wider">Username</label>
+                        <input id="input-username" type="text" class="w-full bg-black/40 border border-gray-700 p-2 rounded text-white text-sm" placeholder="unique_name">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-400 uppercase tracking-wider">Bio Text</label>
+                        <textarea id="input-bio" class="w-full bg-black/40 border border-gray-700 p-2 rounded text-white h-20 text-sm" placeholder="Your status..."></textarea>
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-400 uppercase tracking-wider">Background URL (Image/GIF)</label>
+                        <input id="input-bg" type="text" class="w-full bg-black/40 border border-gray-700 p-2 rounded text-white text-sm" placeholder="https://...">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-400 uppercase tracking-wider">Audio URL (MP3)</label>
+                        <input id="input-music" type="text" class="w-full bg-black/40 border border-gray-700 p-2 rounded text-white text-sm" placeholder="https://...">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-400 uppercase tracking-wider">Accent Color</label>
+                        <div class="flex items-center gap-2">
+                            <input id="input-color" type="color" class="w-full h-8 cursor-pointer bg-transparent border-0">
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="saveProfile()" class="w-full bg-white text-black hover:bg-gray-200 py-3 rounded font-bold mt-auto shadow-[0_0_10px_rgba(255,255,255,0.3)] transition">
+                    SAVE CHANGES
+                </button>
+                
+                <div id="share-link" class="hidden mt-2 p-3 bg-green-900/20 border border-green-500/50 rounded text-center">
+                    <p class="text-[10px] text-green-400 mb-1">DEPLOYED SUCCESSFUL</p>
+                    <a href="#" id="my-link" class="text-xs text-white underline break-all hover:text-green-300" target="_blank">...</a>
+                </div>
+            </div>
+
+            <div class="w-2/3 glass rounded-xl relative overflow-hidden flex items-center justify-center group">
+                <div class="absolute top-4 right-4 text-xs text-gray-500 border border-gray-600 px-2 py-1 rounded">PREVIEW MODE</div>
+                
+                <div id="preview-bg" class="absolute inset-0 bg-cover bg-center opacity-60 transition-all duration-500"></div>
+                
+                <div class="relative z-10 text-center p-8 glass rounded-xl w-80 transform transition group-hover:scale-105">
+                    <img src="https://cdn.discordapp.com/embed/avatars/0.png" class="w-24 h-24 rounded-full mx-auto mb-4 border-2 shadow-lg" id="preview-pfp" style="border-color: white;">
+                    <h1 id="preview-name" class="text-2xl font-bold drop-shadow-md">Username</h1>
+                    <p id="preview-bio" class="text-xs text-gray-300 mt-2 font-mono whitespace-pre-wrap">Bio goes here...</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="profile-view" class="hidden fixed inset-0 z-50 bg-black flex items-center justify-center">
+            
+            <div id="public-bg" class="absolute inset-0 bg-cover bg-center transition-opacity duration-1000 opacity-0 scale-105"></div>
+            
+            <div id="click-overlay" class="absolute inset-0 z-[60] bg-black flex items-center justify-center cursor-pointer">
+                <div class="text-center group">
+                    <p class="text-xl animate-pulse text-gray-300 group-hover:text-white transition">click to enter...</p>
+                </div>
+            </div>
+
+            <div id="public-card" class="glass p-12 rounded-2xl text-center max-w-md w-full mx-4 opacity-0 transform scale-90 transition-all duration-1000 z-10 border-t border-white/20">
+                <img id="public-pfp" src="" class="w-32 h-32 rounded-full mx-auto mb-6 border-[3px] shadow-[0_0_30px_rgba(255,255,255,0.1)] object-cover">
+                
+                <h1 id="public-username" class="text-4xl font-bold mb-4 drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">User</h1>
+                
+                <div class="h-px w-1/2 bg-gradient-to-r from-transparent via-white/50 to-transparent mx-auto mb-6"></div>
+                
+                <div id="public-bio" class="text-gray-200 font-mono text-sm leading-relaxed whitespace-pre-wrap typing-effect"></div>
+                
+                <audio id="public-audio" loop></audio>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ==========================================
+        // 🔴 CONFIGURATION AREA (EDIT THIS!)
+        // ==========================================
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL_HERE';
+        const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY_HERE';
+        // ==========================================
+
+        // Initialize Supabase
+        const { createClient } = supabase;
+        const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // DOM Elements
+        const screens = {
+            loader: document.getElementById('loader'),
+            login: document.getElementById('login-screen'),
+            dashboard: document.getElementById('dashboard-screen'),
+            profile: document.getElementById('profile-view')
+        };
+
+        // --- 1. BOOT SEQUENCE ---
+        async function runBootSequence() {
+            const logs = document.getElementById('boot-log');
+            const bar = document.getElementById('progress-bar');
+            const loader = document.getElementById('loader');
+            
+            const messages = ["connecting_...", "fetching_assets...", "bypassing_auth...", "rendering_ui...", "done."];
+
+            for (let i = 0; i < messages.length; i++) {
+                logs.innerText = "> " + messages[i];
+                let percent = ((i + 1) / messages.length) * 100;
+                bar.style.width = percent + "%";
+                await new Promise(r => setTimeout(r, Math.random() * 200 + 100));
+            }
+
+            loader.style.opacity = "0";
+            setTimeout(() => loader.classList.add('hidden'), 500);
+        }
+
+        // --- 2. INIT LOGIC ---
+        async function init() {
+            // Check URL parameters
+            const params = new URLSearchParams(window.location.search);
+            const viewUser = params.get('u'); 
+
+            await runBootSequence();
+
+            if (viewUser) {
+                // Public Profile Mode
+                loadPublicProfile(viewUser);
+            } else {
+                // Editor Mode
+                const { data: { session } } = await sb.auth.getSession();
+                if (session) {
+                    loadDashboard(session.user);
+                } else {
+                    showScreen('login');
+                }
+            }
+        }
+
+        function showScreen(name) {
+            Object.values(screens).forEach(el => el.classList.add('hidden'));
+            screens[name].classList.remove('hidden');
+        }
+
+        // --- 3. AUTH HANDLERS ---
+        async function login(provider) {
+            await sb.auth.signInWithOAuth({ 
+                provider: provider,
+                options: { redirectTo: window.location.href } 
+            });
+        }
+
+        async function logout() {
+            await sb.auth.signOut();
+            window.location.reload();
+        }
+
+        // --- 4. DASHBOARD LOGIC ---
+        async function loadDashboard(user) {
+            showScreen('dashboard');
+            
+            // Get Profile
+            let { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
+            if (!profile) profile = { username: '', bio: '', bg_url: '', music_url: '', color: '#ffffff' };
+
+            // Set Inputs
+            const inputs = {
+                username: document.getElementById('input-username'),
+                bio: document.getElementById('input-bio'),
+                bg: document.getElementById('input-bg'),
+                music: document.getElementById('input-music'),
+                color: document.getElementById('input-color')
+            };
+
+            inputs.username.value = profile.username || '';
+            inputs.bio.value = profile.bio || '';
+            inputs.bg.value = profile.bg_url || '';
+            inputs.music.value = profile.music_url || '';
+            inputs.color.value = profile.color || '#ffffff';
+
+            // Show Link if exists
+            if(profile.username) {
+                const link = `${window.location.origin}/?u=${profile.username}`;
+                const linkEl = document.getElementById('my-link');
+                document.getElementById('share-link').classList.remove('hidden');
+                linkEl.href = link;
+                linkEl.innerText = link;
+            }
+
+            // Realtime Preview
+            const updatePreview = () => {
+                document.getElementById('preview-bg').style.backgroundImage = `url(${inputs.bg.value})`;
+                document.getElementById('preview-name').innerText = inputs.username.value || 'Username';
+                document.getElementById('preview-name').style.color = inputs.color.value;
+                document.getElementById('preview-pfp').style.borderColor = inputs.color.value;
+                document.getElementById('preview-bio').innerText = inputs.bio.value;
+            };
+
+            // Attach Listeners
+            Object.values(inputs).forEach(el => el.addEventListener('input', updatePreview));
+            updatePreview(); // Run once on load
+        }
+
+        async function saveProfile() {
+            const { data: { user } } = await sb.auth.getUser();
+            const updates = {
+                id: user.id,
+                username: document.getElementById('input-username').value,
+                bio: document.getElementById('input-bio').value,
+                bg_url: document.getElementById('input-bg').value,
+                music_url: document.getElementById('input-music').value,
+                color: document.getElementById('input-color').value,
+            };
+
+            // Basic Validation
+            if(!updates.username) return alert("Username is required!");
+
+            const { error } = await sb.from('profiles').upsert(updates);
+            if (error) alert('Error: ' + error.message);
+            else {
+                alert('Saved successfully!');
+                window.location.reload();
+            }
+        }
+
+        // --- 5. PUBLIC PROFILE LOGIC ---
+        async function loadPublicProfile(username) {
+            showScreen('profile');
+            
+            const { data: profile, error } = await sb.from('profiles').select('*').eq('username', username).single();
+            
+            if (error || !profile) {
+                document.getElementById('click-overlay').innerHTML = "<p class='text-red-500 font-mono'>USER_NOT_FOUND (404)</p>";
+                return;
+            }
+
+            // Populate Data
+            const bg = document.getElementById('public-bg');
+            const card = document.getElementById('public-card');
+            const overlay = document.getElementById('click-overlay');
+            const audio = document.getElementById('public-audio');
+            const pfp = document.getElementById('public-pfp');
+
+            bg.style.backgroundImage = `url(${profile.bg_url})`;
+            document.getElementById('public-username').innerText = profile.username;
+            document.getElementById('public-bio').innerText = profile.bio;
+            
+            // Set Dynamic Colors
+            const color = profile.color || '#ffffff';
+            document.getElementById('public-username').style.color = color;
+            document.getElementById('public-username').style.textShadow = `0 0 20px ${color}80`;
+            pfp.style.borderColor = color;
+            pfp.src = `https://ui-avatars.com/api/?name=${profile.username}&background=random&color=fff&size=256`;
+
+            if(profile.music_url) audio.src = profile.music_url;
+
+            // Click Interaction
+            overlay.addEventListener('click', () => {
+                // Fade out overlay
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.remove(), 500);
+                
+                // Show content
+                bg.style.opacity = '1';
+                card.classList.add('animate-fade');
+                card.style.opacity = '1';
+                card.style.transform = 'scale(1)';
+                
+                // Play Audio
+                if(profile.music_url) {
+                    audio.volume = 0.5;
+                    audio.play().catch(e => console.log('Audio Autoplay Blocked'));
+                }
+            });
+        }
+
+        // Start System
+        init();
+
+    </script>
+</body>
+</html>
